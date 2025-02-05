@@ -2,7 +2,11 @@ package snowflake
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
 	"database/sql"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	nurl "net/url"
@@ -74,7 +78,6 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	conn, err := instance.Conn(context.Background())
-
 	if err != nil {
 		return nil, err
 	}
@@ -118,12 +121,22 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 		return nil, ErrNoSchema
 	}
 
+	// auth := purl.Query().Get("authentication")
+	pKeyStr := strings.ReplaceAll(purl.Query().Get("privateKey"), `\n`, "\n")
+	pKey, err := GetPrivateKey(pKeyStr)
+	fmt.Printf("private key is %s\n\n", pKeyStr)
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := &sf.Config{
-		Account:  purl.Host,
-		User:     purl.User.Username(),
-		Password: password,
-		Database: database,
-		Schema:   schema,
+		Account:       purl.Host,
+		User:          purl.User.Username(),
+		Authenticator: sf.AuthTypeJwt,
+		PrivateKey:    pKey,
+		Password:      password,
+		Database:      database,
+		Schema:        schema,
 	}
 
 	dsn, err := sf.DSN(cfg)
@@ -373,4 +386,26 @@ func (p *Snowflake) ensureVersionTable() (err error) {
 	}
 
 	return nil
+}
+
+func GetPrivateKey(pKey string) (*rsa.PrivateKey, error) {
+	privateKeyBlock, _ := pem.Decode([]byte(pKey))
+	if privateKeyBlock == nil {
+		return nil, errors.New("could not decode private key from config")
+	}
+
+	pk, err := x509.ParsePKCS8PrivateKey(privateKeyBlock.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	var privKey *rsa.PrivateKey
+	switch key := pk.(type) {
+	case *rsa.PrivateKey:
+		privKey = key
+	default:
+		return nil, errors.New("unable to parse private key")
+	}
+
+	return privKey, nil
 }
