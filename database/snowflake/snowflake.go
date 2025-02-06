@@ -56,6 +56,7 @@ func WithInstance(instance *sql.DB, config *Config) (database.Driver, error) {
 	}
 
 	if err := instance.Ping(); err != nil {
+		fmt.Printf("failed to ping\n")
 		return nil, err
 	}
 
@@ -105,6 +106,7 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 	if !isPasswordSet {
 		return nil, ErrNoPassword
 	}
+	fmt.Printf("Password: %s\n", password)
 
 	splitPath := strings.Split(purl.Path, "/")
 	if len(splitPath) < 3 {
@@ -134,9 +136,10 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 		User:          purl.User.Username(),
 		Authenticator: sf.AuthTypeJwt,
 		PrivateKey:    pKey,
-		Password:      password,
-		Database:      database,
-		Schema:        schema,
+		// Password:      password,
+		Database:  database,
+		Schema:    schema,
+		Warehouse: "SF_NATIVE_EXP_WH",
 	}
 
 	dsn, err := sf.DSN(cfg)
@@ -144,18 +147,24 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 		return nil, err
 	}
 
+	fmt.Printf("database is %s\n", database)
+	fmt.Printf("schema is %s\n", schema)
+	fmt.Printf("user is %s\n", cfg.User)
 	db, err := sql.Open("snowflake", dsn)
 	if err != nil {
+		fmt.Printf("open error\n\n")
 		return nil, err
 	}
 
 	migrationsTable := purl.Query().Get("x-migrations-table")
+	fmt.Printf("migrations table is %s\n", migrationsTable)
 
 	px, err := WithInstance(db, &Config{
 		DatabaseName:    database,
 		MigrationsTable: migrationsTable,
 	})
 	if err != nil {
+		fmt.Printf("Other error\n")
 		return nil, err
 	}
 
