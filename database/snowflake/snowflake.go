@@ -130,11 +130,14 @@ func (p *Snowflake) Open(url string) (database.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
+	role := purl.Query().Get("role")
 
 	cfg := &sf.Config{
-		Account:       purl.Host,
+		Account: purl.Host,
+		// Host:          purl.Host + ".snowflakecomputing.com",
 		User:          purl.User.Username(),
 		Authenticator: sf.AuthTypeJwt,
+		Role:          role,
 		PrivateKey:    pKey,
 		// Password:      password,
 		Database:  database,
