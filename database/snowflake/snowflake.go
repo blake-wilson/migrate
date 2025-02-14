@@ -205,6 +205,7 @@ func (p *Snowflake) Run(migration io.Reader) error {
 
 	// run migration
 	query := string(migr[:])
+	p.conn.ExecContext(context.Background(), fmt.Sprintf("ALTER SESSION SET multi_statement_count=0"))
 	if _, err := p.conn.ExecContext(context.Background(), query); err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			var line uint
